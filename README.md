@@ -1,0 +1,2 @@
+# AzDayReloaded-ArmTemplateWorkshop
+ 
