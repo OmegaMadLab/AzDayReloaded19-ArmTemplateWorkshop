@@ -1,0 +1,46 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "vmName": {
+            "value": null
+        },
+        "avsetName": {
+            "value": null
+        },
+        "diagStorAccnt": {
+            "value": null
+        },
+        "vnetName": {
+           "value": "SharedVnet"
+        },
+        "subnetName": {
+           "value": "default"
+        },
+        "vnetResourceGroup": {
+           "value": "AzureDayReloaded-SharedInfra-RG"
+        },
+        "environment": {
+           "value": "DEV"
+        },
+        "domainName": {
+           "value": null
+        },
+        "domainJoinUsername": {
+            "reference": {
+               "keyVault": {
+                  "id": null
+               },
+               "secretName": null
+            }
+        },
+        "domainJoinPassword": {
+            "reference": {
+               "keyVault": {
+                  "id": null
+               },
+               "secretName": null
+         }
+        }
+    }
+}

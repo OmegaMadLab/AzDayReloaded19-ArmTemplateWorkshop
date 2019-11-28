@@ -1,0 +1,30 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "virtualMachines_VmCampione_name": {
+            "value": null
+        },
+        "networkInterfaces_vmcampione183_name": {
+            "value": null
+        },
+        "publicIPAddresses_VmCampione_ip_name": {
+            "value": null
+        },
+        "availabilitySets_VmCampione_AvSet_name": {
+            "value": null
+        },
+        "storageAccounts_azuredayreloadedvmcampio_name": {
+            "value": null
+        },
+        "virtualNetworks_AzureDayReloaded_VmCampione_RG_vnet_name": {
+            "value": null
+        },
+        "localAdmin": {
+            "value": "azureadmin"
+        },
+        "localAdminPassword": {
+            "value": "Passw0rd.123"
+        }
+    }
+}

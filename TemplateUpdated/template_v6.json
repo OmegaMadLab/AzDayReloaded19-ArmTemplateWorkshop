@@ -1,0 +1,501 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "vmName": {
+            "defaultValue": "VmCampione",
+            "type": "String"
+        },
+        /*
+        "networkInterfaces_vmcampione183_name": {
+            "defaultValue": "vmcampione183",
+            "type": "String"
+        },
+        "publicIPAddresses_VmCampione_ip_name": {
+            "defaultValue": "VmCampione-ip",
+            "type": "String"
+        },
+        */
+        "avsetName": {
+            "defaultValue": "VmCampione-AvSet",
+            "type": "String"
+        },
+        /* Quote parameter for NSG name
+        "networkSecurityGroups_VmCampione_nsg_name": {
+            "defaultValue": "VmCampione-nsg",
+            "type": "String"
+        },
+        */
+        "diagStorAccnt": {
+            "defaultValue": "azuredayreloadedvmcampio",
+            "type": "String"
+        },
+        /* Quote parameter for vnet name, it's replaced by a new one
+        "virtualNetworks_AzureDayReloaded_VmCampione_RG_vnet_name": {
+            "defaultValue": "AzureDayReloaded-VmCampione-RG-vnet",
+            "type": "String"
+        }
+        */
+        "vnetName": {
+           "type": "string",
+           "metadata": {
+                "description": "vnet Name"
+            }
+        },
+        "subnetName": {
+           "type": "string",
+           "metadata": {
+                "description": "subnet name"
+            }
+        },
+        "vnetResourceGroup": {
+           "type": "string",
+           "metadata": {
+                "description": "vnet rg"
+            }
+        },
+        "localAdmin": {
+           "type": "string",
+           "metadata": {
+                "description": "local admin"
+            }
+        },
+        "localAdminPassword": {
+           "type": "securestring",
+           "metadata": {
+                "description": "local admin password"
+            }
+        },
+        "OSVersion": {
+           "type": "string",
+           "metadata": {
+                "description": "OS version"
+            },
+            "allowedValues":[
+                "2016",
+                "2019"
+            ]
+        },
+        "environment": {
+           "type": "string",
+           "metadata": {
+                "description": "Environment (DEV or PROD)"
+            },
+            "allowedValues": [
+                "DEV",
+                "PROD"
+            ]
+        },
+        "domainName": {
+           "type": "string",
+           "metadata": {
+                "description": "Domain name"
+            }
+        },
+        "domainJoinUsername": {
+           "type": "string",
+           "metadata": {
+                "description": "Name of the user that will join the server to the domain (DOMAIN\\username)"
+            }
+        },
+        "domainJoinPassword": {
+           "type": "securestring",
+           "metadata": {
+                "description": "Password of the user that will join the server to the domain"
+            }
+        }
+    },
+    "variables": {
+        // Add a variable to manage OS Version - use Get-AzVMImageSku to retrieve values
+        "osImage": "[if(equals(parameters('OSVersion'), '2016'), '2016-Datacenter', '2019-Datacenter')]",
+        // add a variable to calculate subnet resource ID
+        "vnetSubnetId": "[resourceId(parameters('vnetResourceGroup'), 'Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), parameters('subnetName'))]",
+        // Add a variable to define storage type
+        "storageType": "[if(equals(parameters('environment'), 'DEV'), 'StandardSSD_LRS', 'PremiumSSD_LRS')]",
+        // Add a variable to define name of the NIC based on the name of VM
+        "nicName": "[concat(parameters('vmName'), '-NIC')]",
+        // Add a name to define the name of the public IP based on the name of VM
+        "pipName": "[concat(parameters('vmName'), '-PIP')]",
+        // Add a variable to define DSC extension name, composed by vmName and extensionName
+        "dscExtName": "[concat(parameters('vmName'), '/dscConfig')]",
+        // Add a variable for DSC module url
+        "moduleUrl": "https://azdayreloadedarmworkshop.blob.core.windows.net/dsc-config/DscConfig.zip",
+        // Add a variable for DSC script name
+        "scriptName": "dscConfig.ps1",
+        // Add a variable for DSC function name
+        "functionName": "DomainJoin"
+    },
+    "resources": [
+        /* NSG resource removed from template
+        {
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "apiVersion": "2019-09-01",
+            "name": "[parameters('networkSecurityGroups_VmCampione_nsg_name')]",
+            "location": "westeurope",
+            "properties": {
+                "securityRules": [
+                    {
+                        "name": "RDP",
+                        "properties": {
+                            "protocol": "TCP",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "3389",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 300,
+                            "direction": "Inbound",
+                            "sourcePortRanges": [],
+                            "destinationPortRanges": [],
+                            "sourceAddressPrefixes": [],
+                            "destinationAddressPrefixes": []
+                        }
+                    }
+                ]
+            }
+        },
+        */
+        {
+            "type": "Microsoft.Network/publicIPAddresses",
+            "apiVersion": "2019-09-01",
+            "name": "[variables('pipName')]",
+            "location": "westeurope",
+            "sku": {
+                "name": "Basic"
+            },
+            "properties": {
+                "ipAddress": "52.174.83.42",
+                "publicIPAddressVersion": "IPv4",
+                "publicIPAllocationMethod": "Dynamic",
+                "idleTimeoutInMinutes": 4,
+                "ipTags": []
+            }
+        },
+        /* Quote the vnet creation
+        {
+            "type": "Microsoft.Network/virtualNetworks",
+            "apiVersion": "2019-09-01",
+            "name": "[parameters('virtualNetworks_AzureDayReloaded_VmCampione_RG_vnet_name')]",
+            "location": "westeurope",
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "10.1.1.0/24"
+                    ]
+                },
+                "subnets": [
+                    {
+                        "name": "default",
+                        "properties": {
+                            "addressPrefix": "10.1.1.0/24",
+                            "delegations": [],
+                            "privateEndpointNetworkPolicies": "Enabled",
+                            "privateLinkServiceNetworkPolicies": "Enabled"
+                        }
+                    }
+                ],
+                "virtualNetworkPeerings": [],
+                "enableDdosProtection": false,
+                "enableVmProtection": false
+            }
+        },
+        */
+        {
+            "type": "Microsoft.Storage/storageAccounts",
+            "apiVersion": "2019-04-01",
+            "name": "[parameters('diagStorAccnt')]",
+            "location": "westeurope",
+            "sku": {
+                "name": "Standard_LRS",
+                "tier": "Standard"
+            },
+            "kind": "Storage",
+            "properties": {
+                "networkAcls": {
+                    "bypass": "AzureServices",
+                    "virtualNetworkRules": [],
+                    "ipRules": [],
+                    "defaultAction": "Allow"
+                },
+                "supportsHttpsTrafficOnly": true,
+                "encryption": {
+                    "services": {
+                        "file": {
+                            "enabled": true
+                        },
+                        "blob": {
+                            "enabled": true
+                        }
+                    },
+                    "keySource": "Microsoft.Storage"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Compute/availabilitySets",
+            "apiVersion": "2019-03-01",
+            "name": "[parameters('avsetName')]",
+            "location": "westeurope",
+            "dependsOn": [
+                // This is a bug in the exported template - circular dependency
+                //"[resourceId('Microsoft.Compute/virtualMachines', parameters('vmName'))]"
+            ],
+            "sku": {
+                "name": "Aligned"
+            },
+            "properties": {
+                "platformUpdateDomainCount": 5,
+                "platformFaultDomainCount": 2,
+                "virtualMachines": [
+                    {
+                        "id": "[resourceId('Microsoft.Compute/virtualMachines', parameters('vmName'))]"
+                    }
+                ]
+            }
+        },
+        /* Remove NSG rule, since NSG doesn't exist anymore
+        {
+            "type": "Microsoft.Network/networkSecurityGroups/securityRules",
+            "apiVersion": "2019-09-01",
+            "name": "[concat(parameters('networkSecurityGroups_VmCampione_nsg_name'), '/RDP')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroups_VmCampione_nsg_name'))]"
+            ],
+            "properties": {
+                "protocol": "TCP",
+                "sourcePortRange": "*",
+                "destinationPortRange": "3389",
+                "sourceAddressPrefix": "*",
+                "destinationAddressPrefix": "*",
+                "access": "Allow",
+                "priority": 300,
+                "direction": "Inbound",
+                "sourcePortRanges": [],
+                "destinationPortRanges": [],
+                "sourceAddressPrefixes": [],
+                "destinationAddressPrefixes": []
+            }
+        },
+        */
+        /*  Quote subnet definition
+        {
+            "type": "Microsoft.Network/virtualNetworks/subnets",
+            "apiVersion": "2019-09-01",
+            "name": "[concat(parameters('virtualNetworks_AzureDayReloaded_VmCampione_RG_vnet_name'), '/default')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', parameters('virtualNetworks_AzureDayReloaded_VmCampione_RG_vnet_name'))]"
+            ],
+            "properties": {
+                "addressPrefix": "10.1.1.0/24",
+                "delegations": [],
+                "privateEndpointNetworkPolicies": "Enabled",
+                "privateLinkServiceNetworkPolicies": "Enabled"
+            }
+        },
+        */
+        {
+            "type": "Microsoft.Storage/storageAccounts/blobServices",
+            "apiVersion": "2019-04-01",
+            "name": "[concat(parameters('diagStorAccnt'), '/default')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('diagStorAccnt'))]"
+            ],
+            "properties": {
+                "cors": {
+                    "corsRules": []
+                },
+                "deleteRetentionPolicy": {
+                    "enabled": false
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+            "apiVersion": "2019-04-01",
+            "name": "[concat(parameters('diagStorAccnt'), '/default/bootdiagnostics-vmcampion-582007f4-50f6-4528-8c70-31593dafc8e9')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts/blobServices', parameters('diagStorAccnt'), 'default')]",
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('diagStorAccnt'))]"
+            ],
+            "properties": {
+                "publicAccess": "None"
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines",
+            "apiVersion": "2019-03-01",
+            "name": "[parameters('vmName')]",
+            "location": "westeurope",
+            "dependsOn": [
+                "[resourceId('Microsoft.Compute/availabilitySets', parameters('avsetName'))]",
+                // Replace dependency with variable name
+                //"[resourceId('Microsoft.Network/networkInterfaces', parameters('networkInterfaces_vmcampione183_name'))]",
+                "[resourceId('Microsoft.Network/networkInterfaces', variables('nicName'))]",
+                "[resourceId('Microsoft.Storage/StorageAccounts', parameters('diagStorAccnt'))]"
+            ],
+            "properties": {
+                "availabilitySet": {
+                    "id": "[resourceId('Microsoft.Compute/availabilitySets', parameters('avsetName'))]"
+                },
+                "hardwareProfile": {
+                    "vmSize": "Standard_DS1_v2"
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "publisher": "MicrosoftWindowsServer",
+                        "offer": "WindowsServer",
+                        "sku": "[variables('osImage')]",
+                        "version": "latest"
+                    },
+                    "osDisk": {
+                        "osType": "Windows",
+                        // Change to OS disk to generate it from an empty one
+                        //"name": "[concat(parameters('virtualMachines_VmCampione_name'), '_OsDisk_1_9f65983b4588427a8a15deb6b8992587')]",
+                        //"createOption": "FromImage",
+                        "name": "[concat(parameters('vmName'), '-OSDisk')]",
+                        "createOption": "FromImage",
+                        "caching": "ReadWrite",
+                        "managedDisk": {
+                            // Change storage type dinamically
+                            //"storageAccountType": "Standard_LRS"
+                            "storageAccountType": "[variables('storageType')]"
+                            // Reference id is not needed, since we're creating an empty disk
+                            //"id": "[resourceId('Microsoft.Compute/disks', concat(parameters('virtualMachines_VmCampione_name'), '_OsDisk_1_9f65983b4588427a8a15deb6b8992587'))]"
+                        },
+                        "diskSizeGB": 127
+                    },
+                    "dataDisks": [
+                        {
+                            "lun": 0,
+                            // Change to DATA disk to generate it from an empty one
+                            //"name": "[concat(parameters('virtualMachines_VmCampione_name'), '_DataDisk_0')]",
+                            //"createOption": "Attach",
+                            "name": "[concat(parameters('vmName'), '-DISK0')]",
+                            "createOption": "Empty",
+                            "caching": "ReadOnly",
+                            "writeAcceleratorEnabled": false,
+                            "managedDisk": {
+                                // Change storage type dinamically
+                                //"storageAccountType": "Standard_LRS"
+                                "storageAccountType": "[variables('storageType')]"
+                                // Reference id is not needed, since we're creating an empty disk
+                                //"id": "[resourceId('Microsoft.Compute/disks', concat(parameters('virtualMachines_VmCampione_name'), '_DataDisk_0'))]"
+                            },
+                            "diskSizeGB": 32,
+                            "toBeDetached": false
+                        }
+                    ]
+                },
+                "osProfile": {
+                    "computerName": "[parameters('vmName')]",
+                    // Add local admin credentials from parameters
+                    //"adminUsername": "azureadmin",
+                    "adminUsername": "[parameters('localAdmin')]",
+                    "adminPassword": "[parameters('localAdminPassword')]",
+                    "windowsConfiguration": {
+                        "provisionVMAgent": true,
+                        "enableAutomaticUpdates": true
+                    },
+                    "secrets": [],
+                    "allowExtensionOperations": true
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            // Replace resource ID to use variable
+                            //"id": "[resourceId('Microsoft.Network/networkInterfaces', parameters('networkInterfaces_vmcampione183_name'))]"
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('nicName'))]"
+                        }
+                    ]
+                },
+                "diagnosticsProfile": {
+                    "bootDiagnostics": {
+                        "enabled": true,
+                        "storageUri": "[concat('https://', parameters('diagStorAccnt'), '.blob.core.windows.net/')]"
+                    }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkInterfaces",
+            "apiVersion": "2019-09-01",
+            // Change name of the NIC using variable defined before
+            //"name": "[parameters('networkInterfaces_vmcampione183_name')]",
+            "name": "[variables('nicName')]",
+            "location": "westeurope",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/publicIPAddresses', variables('pipName'))]"
+                // Vnet subnet dependency removed, delete comma in line before
+                //"[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworks_AzureDayReloaded_VmCampione_RG_vnet_name'), 'default')]"
+                // NSG dependency removed, delete comma in line before
+                // "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroups_VmCampione_nsg_name'))]"
+            ],
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            // Remove IP Address assignment, since we don't know address spaced of the referenced vnet
+                            //"privateIPAddress": "10.1.1.4",
+                            "privateIPAllocationMethod": "Dynamic",
+                            "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', variables('pipName'))]"
+                            },
+                            "subnet": {
+                                // Quote original subnet ID definition, it's replaced by ID calculater from paramters
+                                //"id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworks_AzureDayReloaded_VmCampione_RG_vnet_name'), 'default')]"
+                                // Add a reference to the variable which contains the subnet ID
+                                "id": "[variables('vnetSubnetId')]"
+                            },
+                            "primary": true,
+                            "privateIPAddressVersion": "IPv4"
+                        }
+                    }
+                ],
+                "dnsSettings": {
+                    "dnsServers": []
+                },
+                "enableAcceleratedNetworking": false,
+                "enableIPForwarding": false
+                /* Removed reference to NSG, delete also comma in line before
+                "networkSecurityGroup": {
+                    "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroups_VmCampione_nsg_name'))]"
+                }
+                */
+            }
+        },
+        // DSC Resource for domain join. Depends on VM resource
+        {
+            "name": "[variables('dscExtName')]",
+            "type": "Microsoft.Compute/virtualMachines/extensions",
+            "apiVersion": "2018-10-01",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Compute/virtualMachines', parameters('vmName'))]"
+            ],
+            "properties": {
+                "publisher": "Microsoft.Powershell",
+                "type": "DSC",
+                "typeHandlerVersion": "2.9",
+                "autoUpgradeMinorVersion": true,
+                "settings": {
+                    "configuration": {
+                        "url": "[variables('moduleUrl')]",
+                        "script": "[variables('scriptName')]",
+                        "function": "[variables('functionName')]",
+                    }
+                },
+                "protectedSettings": {
+                    "configurationArguments": {
+                        "DomainName": "[parameters('domainName')]",
+                        "DomainCreds": {
+                            "userName": "[parameters('domainJoinUsername')]",
+                            "password": "[parameters('domainJoinPassword')]"
+                        }
+                    }
+                }
+            }
+        }
+    ]
+}
+

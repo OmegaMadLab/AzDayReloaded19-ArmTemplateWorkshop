@@ -1,0 +1,35 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "vnetResourceGroup": {
+           "type": "string",
+           "metadata": {
+                "description": "RGName"
+            }
+        },
+        "vnetName": {
+           "type": "string",
+           "metadata": {
+                "description": "VnetName"
+            }
+        },
+        "subnetName": {
+           "type": "string",
+           "metadata": {
+                "description": "subnetName"
+            }
+        }
+    },
+    "variables": {
+        "vnetSubnetId": "[resourceId(parameters('vnetResourceGroup'), 'Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), parameters('subnetName'))]"
+    },
+    "resources": [],
+    "outputs": {
+        "output1": {
+           "type": "string",
+           "value": "[variables('vnetSubnetId')]"
+        }
+    },
+    "functions": []
+}
