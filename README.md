@@ -1,2 +1,2 @@
-# AzDayReloaded-ArmTemplateWorkshop
+# AzDayReloaded19-ArmTemplateWorkshop
  
